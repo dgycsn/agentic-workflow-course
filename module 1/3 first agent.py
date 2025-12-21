@@ -1,6 +1,7 @@
 from litellm import completion
 from typing import List, Dict
 import json
+import os
 
 model = "qwen3-coder:30b"
 
@@ -13,28 +14,19 @@ def generate_response(messages: List[Dict]) -> str:
     )
     return response.choices[0].message.content
 
-#%%
 
-mystr = """
-write me a function that splits lines of string and returns all lines that lie between two "```" blocks. for instance:
-eqweqwewq
-```action
-hello world
-```
-dasddasdasdasdas
-must return hello world"""
-generate_response([{"role": "user", "content": mystr}])
 #%%
 def list_files():
-    None
+    return os.listdir()
 
-def read_file():
-    None
+def read_file(filename):
+    f = open(filename)
+    return f.read()
     
 def parse_action(response: str) -> Dict:
     """Parse the LLM response into a structured action dictionary."""
     try:
-        response = extract_markdown_block(response, "action")
+        response = extract_markdown_block(response)
         response_json = json.loads(response)
         if "tool_name" in response_json and "args" in response_json:
             return response_json
@@ -43,7 +35,9 @@ def parse_action(response: str) -> Dict:
     except json.JSONDecodeError:
         return {"tool_name": "error", "args": {"message": "Invalid JSON response. You must respond with a JSON tool invocation."}}
     
-    
+
+
+# TODO: can add another variable to extract only the "action" markdown
 def extract_markdown_block(text): 
     """ 
     Extracts all lines that lie between ```` ``` ```` blocks from a string.
@@ -53,17 +47,17 @@ def extract_markdown_block(text):
              Returns: 
         list: List of strings containing content between ```` ``` ```` blocks 
     """     
-    if not '```' in response:
-        return response
-    lines = text.split('\\n') 
+    if not '```' in text:
+        return text
+    lines = text.split('\n') 
     result = [] 
     in_code_block = False     
     current_block = []          
     for line in lines: 
-        if line.strip() == '```': 
+        if line.strip().startswith('```'):
             if in_code_block: 
                 # End of code block - add content to result 
-                result.append('\\n'.join(current_block))
+                result.append(''.join(current_block))
                 current_block = [] 
                 in_code_block = False 
             else: 
@@ -73,7 +67,7 @@ def extract_markdown_block(text):
             # We\'re inside a code block, collect the line 
             current_block.append(line) 
      
-    return result 
+    return result[0]
 
 #%%
 agent_rules = [{
@@ -88,7 +82,7 @@ Available tools:
 
 If a user asks about files, list them before reading.
 
-Every response MUST have an action, but can also include your reasoning.
+Every response MUST have an action, but also include your reasoning.
 Respond in this markdown format:
 
 ```action
@@ -116,14 +110,14 @@ You can then guess which file would be most relevant and ask to read that file:
 ```action
 {
     "tool_name": "read_file()",
-    "args": "recipes.txt"
+    "args": {
+        "file_name": "recipes.txt"
+    }
 }
 ```
 """
 }]
 
-
-generate_response(agent_rules)
 #%%
 """
 function to list files and read their contents
@@ -132,6 +126,10 @@ if __name__ == "__main__":
     iterations = 0
     max_iterations = 10
     memory = []
+    
+    user_request = "find me the function that i can use to perform an llm call"
+    memory.append({"role": "user", "content": user_request})
+    
     # The Agent Loop
     while iterations < max_iterations:
     
@@ -139,7 +137,7 @@ if __name__ == "__main__":
         prompt = agent_rules + memory
     
         # 2. Generate response from LLM
-        print("Agent thinking...")
+        print("\n\n ############ Agent thinking... ############")
         response = generate_response(prompt)
         print(f"Agent response:\n {response}")
     
@@ -148,7 +146,7 @@ if __name__ == "__main__":
     
         result = "Action executed"
     
-        if action["tool_name"] == "list_files":
+        if action["tool_name"] == "list_files()":
             result = {"result":list_files()}
         elif action["tool_name"] == "read_file":
             result = {"result":read_file(action["args"]["file_name"])}

@@ -1,0 +1,111 @@
+ ############ Agent thinking... ############
+Agent response:
+ ```action
+{
+    "tool_name": "list_files()",
+    "args": ""
+}
+```
+Action result: {'result': ['0 first_try.py', '1 prompt exercise.py', '2 memory exercise.py', '2 memory.py', '3 first agent.py', 'output from first agent.txt']}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ I need to find the function for performing an LLM call. Based on the file names, it seems like this might be in one of the Python files. Let me check the most likely candidates that would contain LLM-related functionality.
+
+I'll start by reading the first agent file since that seems most relevant to LLM operations:
+```action
+{
+    "tool_name": "read_file()",
+    "args": {
+        "file_name": "3 first agent.py"
+    }
+}
+```
+Action result: {'error': 'Unknown action: read_file()'}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ I need to find the function for performing an LLM call. Let me first check what files are available, then look at the most relevant ones.
+
+```action
+{
+    "tool_name": "list_files",
+    "args": {}
+}
+```
+Action result: {'error': 'Unknown action: list_files'}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ I need to find the function for performing an LLM call. Let me first list the available files to identify which ones might contain LLM-related code.
+
+```action
+{
+    "tool_name": "list_files()",
+    "args": {}
+}
+```
+Action result: {'result': ['0 first_try.py', '1 prompt exercise.py', '2 memory exercise.py', '2 memory.py', '3 first agent.py', 'output from first agent.txt']}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ I need to find the function for performing an LLM call. I'll examine the Python files since they're most likely to contain the code. Let me start by reading the first agent file since that seems most relevant to LLM operations:
+
+```action
+{
+    "tool_name": "read_file",
+    "args": {
+        "file_name": "3 first agent.py"
+    }
+}
+```
+Action result: {'result': 'from litellm import completion\nfrom typing import List, Dict\nimport json\nimport os\n\nmodel = "qwen3-coder:30b"\n\ndef generate_response(messages: List[Dict]) -> str:\n    """Call LLM to get response"""\n    response = completion(\n        model="ollama/" + model,\n        messages=messages,\n        max_tokens=1024\n    )\n    return response.choices[0].message.content\n\n\n#%%\ndef list_files():\n    return os.listdir()\n\ndef read_file(filename):\n    f = open(filename)\n    return f.read()\n    \ndef parse_action(response: str) -> Dict:\n    """Parse the LLM response into a structured action dictionary."""\n    try:\n        response = extract_markdown_block(response)\n        response_json = json.loads(response)\n        if "tool_name" in response_json and "args" in response_json:\n            return response_json\n        else:\n            return {"tool_name": "error", "args": {"message": "You must respond with a JSON tool invocation."}}\n    except json.JSONDecodeError:\n        return {"tool_name": "error", "args": {"message": "Invalid JSON response. You must respond with a JSON tool invocation."}}\n    \n    \ndef extract_markdown_block(text): \n    """ \n    Extracts all lines that lie between ```` ``` ```` blocks from a string.\n    \n      Args:\n         text (str): Input string containing markdown-style code blocks \n             Returns: \n        list: List of strings containing content between ```` ``` ```` blocks \n    """     \n    if not \'```\' in text:\n        return text\n    lines = text.split(\'\\n\') \n    result = [] \n    in_code_block = False     \n    current_block = []          \n    for line in lines: \n        if line.strip().startswith(\'```\'):\n            if in_code_block: \n                # End of code block - add content to result \n                result.append(\'\'.join(current_block))\n                current_block = [] \n                in_code_block = False \n            else: \n                # Start of code block \n                in_code_block = True \n        elif in_code_block: \n            # We\\\'re inside a code block, collect the line \n            current_block.append(line) \n     \n    return result[0]\n\n#%%\nagent_rules = [{\n    "role": "system",\n    "content": """ \n   You are an AI agent that can perform tasks by using available tools.\n\nAvailable tools:\n- list_files() -> List[str]: List all files in the current directory.\n- read_file(file_name: str) -> str: Read the content of a file.\n- terminate(message: str): End the agent loop and print a summary to the user.\n\nIf a user asks about files, list them before reading.\n\nEvery response MUST have an action, but also include your reasoning.\nRespond in this markdown format:\n\n```action\n{\n    "tool_name": "insert tool_name",\n    "args": {...fill in any required arguments here...}\n}\n```\n\nExample question from user: \n"Hello i need to find a specific file about {topic}"\n\nYour output must then be:\n```action\n{\n    "tool_name": "list_files()",\n    "args": ""\n}\n```\n\nAfterwards, the output will be provided to you e.g.:\n[recipes.txt, warcrimes.pdf, kittens.gif]\n\nYou can then guess which file would be most relevant and ask to read that file:\n```action\n{\n    "tool_name": "read_file()",\n    "args": {\n        "file_name": "recipes.txt"\n    }\n}\n```\n"""\n}]\n\n#%%\n"""\nfunction to list files and read their contents\n"""\nif __name__ == "__main__":\n    iterations = 0\n    max_iterations = 10\n    memory = []\n    \n    user_request = "find me the function that i can use to perform an llm call"\n    memory.append({"role": "user", "content": user_request})\n    \n    # The Agent Loop\n    while iterations < max_iterations:\n    \n        # 1. Construct prompt: Combine agent rules with memory\n        prompt = agent_rules + memory\n    \n        # 2. Generate response from LLM\n        print("\\n\\n ############ Agent thinking... ############")\n        response = generate_response(prompt)\n        print(f"Agent response:\\n {response}")\n    \n        # 3. Parse response to determine action\n        action = parse_action(response)\n    \n        result = "Action executed"\n    \n        if action["tool_name"] == "list_files()":\n            result = {"result":list_files()}\n        elif action["tool_name"] == "read_file":\n            result = {"result":read_file(action["args"]["file_name"])}\n        elif action["tool_name"] == "error":\n            result = {"error":action["args"]["message"]}\n        elif action["tool_name"] == "terminate":\n            print(action["args"]["message"])\n            break\n        else:\n            result = {"error":"Unknown action: "+action["tool_name"]}\n    \n        print(f"Action result: {result}")\n    \n        # 5. Update memory with response and results\n        memory.extend([\n            {"role": "assistant", "content": response},\n            {"role": "user", "content": json.dumps(result)}\n        ])\n    \n        # 6. Check termination condition\n        if action["tool_name"] == "terminate":\n            break\n    \n        iterations += 1'}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ Based on the code I've examined, I can see the function you're looking for to perform an LLM call. It's called `generate_response()` in the file "3 first agent.py".
+
+Here's the function definition:
+
+```python
+def generate_response(messages: List[Dict]) -> str:
+    """Call LLM to get response"""
+    response = completion(
+        model="ollama/" + model,
+        messages=messages,
+        max_tokens=1024
+    )
+    return response.choices[0].message.content
+```
+
+This function uses the `completion` function from the `litellm` library to make the actual LLM call. It takes a list of message dictionaries as input and returns the generated response content.
+
+The function is designed to work with the Qwen3-coder model (as specified by the `model = "qwen3-coder:30b"` variable) and is used within the agent loop to generate responses to user requests.
+
+```action
+{
+    "tool_name": "terminate",
+    "args": {
+        "message": "Found the LLM call function: 'generate_response()'. It uses litellm.completion() to make calls to the Qwen3-coder model and returns the response content."
+    }
+}
+```
+Action result: {'error': 'Invalid JSON response. You must respond with a JSON tool invocation.'}
+
+
+ ############ Agent thinking... ############
+Agent response:
+ ```action
+{
+    "tool_name": "terminate",
+    "args": {
+        "message": "Found the LLM call function: 'generate_response()'. It uses litellm.completion() to make calls to the Qwen3-coder model and returns the response content."
+    }
+}
+```
+Found the LLM call function: 'generate_response()'. It uses litellm.completion() to make calls to the Qwen3-coder model and returns the response content.
