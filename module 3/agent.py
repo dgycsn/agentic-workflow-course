@@ -5,13 +5,7 @@ from goal import Goal
 from action import ActionRegistry
 from memory import Memory
 from environment import Environment
-
-
-class AgentLanguage:
-    None
-
-class Prompt:
-    None
+from language import AgentLanguage, Prompt
     
 #%%
 
@@ -54,6 +48,8 @@ class Agent:
 
     def construct_prompt(self, goals: List[Goal], memory: Memory, actions: ActionRegistry) -> Prompt:
         """Build prompt with memory context"""
+        # print(self.agent_language)
+        # print(self.actions)
         return self.agent_language.construct_prompt(
             actions=actions.get_actions(),
             environment=self.environment,
@@ -97,6 +93,7 @@ class Agent:
 
         for _ in range(max_iterations):
             # Construct a prompt that includes the Goals, Actions, and the current Memory
+            # print(self.actions)
             prompt = self.construct_prompt(self.goals, memory, self.actions)
 
             print("Agent thinking...")

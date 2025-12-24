@@ -56,7 +56,7 @@ class ActionRegistry:
 
     def get_actions(self) -> List[Action]:
         """Get all registered actions, read their names via .keys()"""
-        return list(self.actions)
+        return list(self.actions.values())
     
 #%%
 

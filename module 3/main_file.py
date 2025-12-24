@@ -1,24 +1,53 @@
 from goal import Goal
 from action import Action, ActionRegistry
 import functions
-from agent import Agent, AgentLanguage
+from agent import Agent
 from environment import Environment
 from schema import schema_from_function
 
 from litellm import completion
-from typing import List, Dict
+from language import AgentFunctionCallingActionLanguage, Prompt
+import json
 
 #%%
-model = "qwen3-coder:30b"
+model = "ollama/qwen3-coder:30b"
 
-def generate_response(messages: List[Dict]) -> str:
+def generate_response(prompt: Prompt) -> str:
     """Call LLM to get response"""
-    response = completion(
-        model="ollama/" + model,
-        messages=messages,
-        max_tokens=1024
-    )
-    return response.choices[0].message.content
+
+    messages = prompt.messages
+    tools = prompt.tools
+    # print(tools)
+
+    result = None
+
+    if not tools:
+        response = completion(
+            model=model,
+            messages=messages,
+            max_tokens=1024
+        )
+        result = response.choices[0].message.content
+    else:
+        response = completion(
+            model=model,
+            messages=messages,
+            tools=tools,
+            max_tokens=1024
+        )
+
+        if response.choices[0].message.tool_calls:
+            tool = response.choices[0].message.tool_calls[0]
+            result = {
+                "tool": tool.function.name,
+                "args": json.loads(tool.function.arguments),
+            }
+            result = json.dumps(result)
+        else:
+            result = response.choices[0].message.content
+
+
+    return result
 #%%
 goals = [
     Goal(
@@ -49,8 +78,9 @@ for key in defined_funcs.keys():
         function=curr_func,
         description=curr_func.__doc__,
         parameters=parameted_scheme,
-        terminal=True
+        terminal=key[:6] == "termin"
     )
+    action_registry.register(curraction)
     
 #%%
 # Define the agent language and environment
@@ -68,7 +98,7 @@ file_explorer_agent = Agent(
 
 # Run the agent
 user_input = input("What would you like me to do? ")
-final_memory = file_explorer_agent.run(user_input, max_iterations=10)
+final_memory = file_explorer_agent.run(user_input, max_iterations=20)
 
 # Print the final conversation if desired
 for item in final_memory.get_memories():

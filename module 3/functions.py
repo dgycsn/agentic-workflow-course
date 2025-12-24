@@ -1,6 +1,9 @@
 import os
 from typing import List
 
+# hardcoded functions so that
+# if function starts with "termin", terminate
+
 def list_files() -> List[str]:
     """List files in the current directory."""
     return os.listdir(".")
